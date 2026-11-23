@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>&#8203;</title>
+    <!-- Tailwind CSS para utilidades responsivas -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tipografía japonesa limpia para escritura -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-warm: #f6efe4;
+            --washi-paper: #fcf9f2;
+            --ink-sumi: #231f20;
+            --hanko-red: #c83e37;
+            --hanko-red-hover: #a82e28;
+            --line-tint: rgba(168, 138, 114, 0.14);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            min-height: 100vh;
+            background-color: var(--bg-warm);
+            /* Degradado suave inspirado en luz matinal japonesa */
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(255, 224, 230, 0.45) 0%, transparent 45%),
+                radial-gradient(circle at 85% 85%, rgba(235, 217, 193, 0.5) 0%, transparent 50%);
+            overflow-x: hidden;
+            font-family: 'Noto Serif JP', serif;
+        }
+
+        /* Lienzo de pétalos de sakura animados en el fondo */
+        #sakura-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Hoja principal estilo papel Washi */
+        .washi-sheet {
+            position: relative;
+            z-index: 10;
+            background-color: var(--washi-paper);
+            /* Textura sutil de fibras y renglones tradicionales */
+            background-image: 
+                radial-gradient(rgba(180, 155, 130, 0.08) 1px, transparent 0),
+                linear-gradient(transparent 96%, var(--line-tint) 96%);
+            background-size: 24px 24px, 100% 2.35rem;
+            border: 1px solid rgba(168, 138, 114, 0.28);
+            box-shadow: 
+                0 20px 50px -15px rgba(45, 30, 20, 0.12),
+                0 4px 12px rgba(45, 30, 20, 0.05);
+            border-radius: 16px;
+            transition: box-shadow 0.3s ease;
+        }
+
+        /* Área de escritura limpia sin bordes ni distracciones */
+        textarea#note-editor {
+            width: 100%;
+            height: 76vh;
+            min-height: 420px;
+            background: transparent;
+            border: none;
+            outline: none;
+            resize: none;
+            padding: 3.5rem 2.25rem 2.25rem 2.25rem;
+            font-family: 'Noto Serif JP', serif;
+            font-size: 1.12rem;
+            line-height: 2.35rem;
+            color: var(--ink-sumi);
+            caret-color: var(--hanko-red);
+            letter-spacing: 0.02em;
+        }
+
+        /* Botón circular rojo estilo sello japonés Hanko (sin texto) */
+        .hanko-btn {
+            position: absolute;
+            top: 1.15rem;
+            right: 1.15rem;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background-color: var(--hanko-red);
+            color: #fcf9f2;
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            box-shadow: 
+                0 4px 10px rgba(200, 62, 55, 0.32),
+                inset 0 0 0 2px rgba(140, 30, 25, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 20;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, box-shadow 0.25s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .hanko-btn:hover {
+            background-color: var(--hanko-red-hover);
+            transform: scale(1.07);
+        }
+
+        .hanko-btn:active {
+            transform: scale(0.94);
+        }
+
+        /* Destello visual al copiar enlace */
+        .hanko-btn.copied-flash {
+            background-color: #2e7d5b;
+            box-shadow: 0 0 0 8px rgba(46, 125, 91, 0.22), 0 4px 12px rgba(46, 125, 91, 0.4);
+            transform: scale(1.1);
+        }
+
+        /* Scrollbar minimalista */
+        textarea#note-editor::-webkit-scrollbar {
+            width: 6px;
+        }
+        textarea#note-editor::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        textarea#note-editor::-webkit-scrollbar-thumb {
+            background: rgba(168, 138, 114, 0.3);
+            border-radius: 9999px;
+        }
+        textarea#note-editor::-webkit-scrollbar-thumb:hover {
+            background: rgba(200, 62, 55, 0.45);
+        }
+
+        @media (max-width: 640px) {
+            textarea#note-editor {
+                height: 82vh;
+                padding: 3.5rem 1.25rem 1.5rem 1.25rem;
+                font-size: 1rem;
+                line-height: 2.15rem;
+            }
+            .washi-sheet {
+                background-size: 20px 20px, 100% 2.15rem;
+                border-radius: 14px;
+            }
+            .hanko-btn {
+                top: 0.85rem;
+                right: 0.85rem;
+                width: 42px;
+                height: 42px;
+            }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-3 sm:p-6 md:p-10">
+
+    <!-- Fondo animado de pétalos de cerezo (Sakura) -->
+    <canvas id="sakura-canvas" aria-hidden="true"></canvas>
+
+    <!-- Contenedor único del bloc de notas sin títulos ni instrucciones -->
+    <main class="washi-sheet w-full max-w-4xl">
+        <!-- Botón sello Hanko para copiar enlace compartido -->
+        <button id="copy-hanko-btn" type="button" class="hanko-btn" aria-label="Copiar">
+            <svg id="icon-link" xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+            </svg>
+            <svg id="icon-check" class="hidden" xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        </button>
+
+        <!-- Área de escritura pura (sin placeholder ni etiquetas) -->
+        <textarea id="note-editor" spellcheck="false" autocomplete="off" autofocus></textarea>
+    </main>
+
+    <!-- Lógica de animación Sakura + Sincronización colaborativa en tiempo real -->
+    <script type="module">
+        // ==========================================
+        // 1. ANIMACIÓN DE PÉTALOS DE SAKURA (CANVAS)
+        // ==========================================
+        const canvas = document.getElementById('sakura-canvas');
+        const ctx = canvas.getContext('2d');
+        let petals = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        class Petal {
+            constructor(initial = false) {
+                this.reset(initial);
+            }
+
+            reset(initial = false) {
+                this.x = Math.random() * canvas.width;
+                this.y = initial ? Math.random() * canvas.height : -20;
+                this.size = 6 + Math.random() * 8;
+                this.speedY = 0.55 + Math.random() * 0.95;
+                this.speedX = -0.35 + Math.random() * 0.7;
+                this.angle = Math.random() * Math.PI * 2;
+                this.spin = (Math.random() - 0.5) * 0.025;
+                this.swayAmplitude = 0.4 + Math.random() * 0.8;
+                this.swayOffset = Math.random() * Math.PI * 2;
+                this.opacity = 0.35 + Math.random() * 0.45;
+                const colors = ['#f9c5d1', '#fbcfe8', '#f4acb7', '#ffd6e0'];
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+            }
+
+            update(time) {
+                this.y += this.speedY;
+                this.x += this.speedX + Math.sin(time * 0.001 + this.swayOffset) * this.swayAmplitude;
+                this.angle += this.spin;
+
+                if (this.y > canvas.height + 20 || this.x < -30 || this.x > canvas.width + 30) {
+                    this.reset(false);
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                ctx.globalAlpha = this.opacity;
+                ctx.fillStyle = this.color;
+
+                ctx.beginPath();
+                ctx.moveTo(0, -this.size);
+                ctx.bezierCurveTo(
+                    this.size * 0.85, -this.size * 0.7,
+                    this.size * 0.85, this.size * 0.5,
+                    0, this.size
+                );
+                ctx.bezierCurveTo(
+                    -this.size * 0.85, this.size * 0.5,
+                    -this.size * 0.85, -this.size * 0.7,
+                    0, -this.size
+                );
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function initSakura() {
+            resizeCanvas();
+            const count = Math.min(38, Math.max(16, Math.floor(window.innerWidth / 38)));
+            petals = Array.from({ length: count }, () => new Petal(true));
+        }
+
+        function animateSakura(time) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (const petal of petals) {
+                petal.update(time);
+                petal.draw();
+            }
+            requestAnimationFrame(animateSakura);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('load', () => {
+            initSakura();
+            requestAnimationFrame(animateSakura);
+        });
+
+        // ==========================================
+        // 2. GESTIÓN DE ENLACE CORTO Y FIJO (SIN CRECER)
+        // ==========================================
+        const urlParams = new URLSearchParams(window.location.search);
+        let noteId = urlParams.get('n');
+
+        // Genera un identificador corto fijo de 8 caracteres si no existe en la URL
+        if (!noteId || !/^[a-zA-Z0-9_-]{4,16}$/.test(noteId)) {
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let randomId = '';
+            for (let i = 0; i < 8; i++) {
+                randomId += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            noteId = randomId;
+            try {
+                const fixedUrl = `${window.location.pathname}?n=${noteId}`;
+                window.history.replaceState(null, '', fixedUrl);
+            } catch (e) {}
+        } else if (window.location.hash) {
+            // Limpia cualquier hash previo para mantener la URL corta y limpia
+            try {
+                window.history.replaceState(null, '', `${window.location.pathname}?n=${noteId}`);
+            } catch (e) {}
+        }
+
+        const editor = document.getElementById('note-editor');
+        const copyBtn = document.getElementById('copy-hanko-btn');
+        const iconLink = document.getElementById('icon-link');
+        const iconCheck = document.getElementById('icon-check');
+        const LOCAL_BACKUP_KEY = `washi_note_${noteId}`;
+
+        // Carga respaldo local inmediato mientras responde la nube
+        try {
+            const cached = localStorage.getItem(LOCAL_BACKUP_KEY);
+            if (cached) {
+                editor.value = cached;
+            }
+        } catch (e) {}
+
+        // Copiar enlace corto y fijo al portapapeles
+        copyBtn.addEventListener('click', () => {
+            const shareUrl = `${window.location.origin}${window.location.pathname}?n=${noteId}`;
+            const tempInput = document.createElement('input');
+            tempInput.value = shareUrl;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            tempInput.setSelectionRange(0, 99999);
+            try {
+                document.execCommand('copy');
+            } catch (err) {
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(shareUrl).catch(() => {});
+                }
+            }
+            document.body.removeChild(tempInput);
+
+            copyBtn.classList.add('copied-flash');
+            iconLink.classList.add('hidden');
+            iconCheck.classList.remove('hidden');
+
+            setTimeout(() => {
+                copyBtn.classList.remove('copied-flash');
+                iconCheck.classList.add('hidden');
+                iconLink.classList.remove('hidden');
+            }, 1100);
+        });
+
+        // ==========================================
+        // 3. SINCRONIZACIÓN ABIERTA EN LA NUBE (URL FIJA)
+        // ==========================================
+        const CLOUD_PRIMARY = `https://kvdb.io/A6m8K9pQ2xLw7vR4nT1zYc/washi_${noteId}`;
+        const CLOUD_FALLBACK = `https://textdb.dev/api/data/washi_jp_${noteId}`;
+        const clientSessionId = Math.random().toString(36).substring(2, 10);
+
+        let isLocalTyping = false;
+        let typingTimeout = null;
+        let saveTimeout = null;
+        let lastSyncedText = editor.value;
+        let lastTimestamp = 0;
+
+        function saveLocalBackup(text) {
+            try {
+                localStorage.setItem(LOCAL_BACKUP_KEY, text);
+            } catch (e) {}
+        }
+
+        function applyRemoteText(remoteText) {
+            if (typeof remoteText !== 'string' || remoteText === editor.value) return;
+
+            const selStart = editor.selectionStart;
+            const selEnd = editor.selectionEnd;
+            const hadFocus = document.activeElement === editor;
+
+            editor.value = remoteText;
+            lastSyncedText = remoteText;
+            saveLocalBackup(remoteText);
+
+            if (hadFocus) {
+                const safeStart = Math.min(selStart, remoteText.length);
+                const safeEnd = Math.min(selEnd, remoteText.length);
+                editor.setSelectionRange(safeStart, safeEnd);
+            }
+        }
+
+        async function fetchCloudNote() {
+            if (isLocalTyping) return;
+
+            // Intento 1: almacenamiento principal kvdb.io
+            try {
+                const res = await fetch(`${CLOUD_PRIMARY}?t=${Date.now()}`, {
+                    method: 'GET',
+                    cache: 'no-store'
+                });
+                if (res.ok) {
+                    const payload = await res.json();
+                    if (payload && typeof payload.content === 'string') {
+                        if (!(payload.editor === clientSessionId && isLocalTyping)) {
+                            if (!payload.updatedAt || payload.updatedAt >= lastTimestamp) {
+                                lastTimestamp = payload.updatedAt || Date.now();
+                                applyRemoteText(payload.content);
+                            }
+                        }
+                        return;
+                    }
+                }
+            } catch (e) {}
+
+            // Intento 2: respaldo en textdb.dev
+            try {
+                const resFb = await fetch(`${CLOUD_FALLBACK}?t=${Date.now()}`, {
+                    method: 'GET',
+                    cache: 'no-store'
+                });
+                if (resFb.ok) {
+                    const raw = await resFb.text();
+                    if (raw) {
+                        const payload = JSON.parse(raw);
+                        if (payload && typeof payload.content === 'string') {
+                            if (!payload.updatedAt || payload.updatedAt >= lastTimestamp) {
+                                lastTimestamp = payload.updatedAt || Date.now();
+                                applyRemoteText(payload.content);
+                            }
+                        }
+                    }
+                }
+            } catch (e) {}
+        }
+
+        async function pushCloudNote(text) {
+            const now = Date.now();
+            lastTimestamp = now;
+            lastSyncedText = text;
+            saveLocalBackup(text);
+
+            const bodyJson = JSON.stringify({
+                content: text,
+                updatedAt: now,
+                editor: clientSessionId
+            });
+
+            // Guarda en almacenamiento principal y espejo simultáneamente
+            try {
+                await fetch(CLOUD_PRIMARY, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: bodyJson
+                });
+            } catch (e) {}
+
+            try {
+                await fetch(CLOUD_FALLBACK, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: bodyJson
+                });
+            } catch (e) {}
+        }
+
+        editor.addEventListener('input', () => {
+            const currentText = editor.value;
+            isLocalTyping = true;
+            saveLocalBackup(currentText);
+
+            clearTimeout(typingTimeout);
+            clearTimeout(saveTimeout);
+
+            typingTimeout = setTimeout(() => {
+                isLocalTyping = false;
+            }, 1100);
+
+            saveTimeout = setTimeout(() => {
+                if (currentText !== lastSyncedText) {
+                    pushCloudNote(currentText);
+                }
+            }, 350);
+        });
+
+        // Carga inicial y sondeo continuo cada 1.5s para edición colaborativa en vivo
+        fetchCloudNote();
+        setInterval(fetchCloudNote, 1500);
+    </script>
+</body>
+</html>
